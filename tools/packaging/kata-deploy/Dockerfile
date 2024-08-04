@@ -19,7 +19,7 @@ COPY ${KATA_ARTIFACTS} ${WORKDIR}
 # word splitting, which can also be ignored for now.
 # hadolint ignore=DL3018,SC2086
 RUN \
-	apk --no-cache add bash curl && \
+	apk --no-cache add bash curl squashfs-tools && \
 	ARCH=$(uname -m) && \
 	if [ "${ARCH}" = "x86_64" ]; then ARCH=amd64; fi && \
 	if [ "${ARCH}" = "aarch64" ]; then ARCH=arm64; fi && \
