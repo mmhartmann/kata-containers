@@ -56,6 +56,10 @@ function host_systemctl() {
 	nsenter --target 1 --mount systemctl "${@}"
 }
 
+function host_systemd_sysext_reload() {
+    nsenter --target 1 --mount systemd-sysext refresh
+}
+
 function print_usage() {
 	echo "Usage: $0 [install/cleanup/reset]"
 }
@@ -114,8 +118,8 @@ function get_container_runtime() {
 		else
 			echo "k3s"
 		fi
-	# Note: we assumed you used a conventional k0s setup and k0s will generate a systemd entry k0scontroller.service and k0sworker.service respectively    
-	# and it is impossible to run this script without a kubelet, so this k0s controller must also have worker mode enabled 
+	# Note: we assumed you used a conventional k0s setup and k0s will generate a systemd entry k0scontroller.service and k0sworker.service respectively
+	# and it is impossible to run this script without a kubelet, so this k0s controller must also have worker mode enabled
 	elif host_systemctl is-active --quiet k0scontroller; then
 		echo "k0s-controller"
 	elif host_systemctl is-active --quiet k0sworker; then
@@ -279,7 +283,7 @@ function install_artifacts() {
 				*)
 					tdx_not_supported ${ID} ${VERSION_ID}
 					;;
-			esac	
+			esac
 		fi
 	done
 
@@ -317,6 +321,9 @@ function configure_cri_runtime() {
 		configure_containerd "$1"
 		;;
 	esac
+
+	create_sysext
+
 	if [ "$1" == "k0s-worker" ] || [ "$1" == "k0s-controller" ]; then
 		# do nothing, k0s will automatically load the config on the fly
 		:
@@ -502,12 +509,12 @@ function configure_containerd_runtime() {
 	local runtime_options_table="${runtime_table}.options"
 	local runtime_type=\"io.containerd."${runtime}".v2\"
 	local runtime_config_path=\"$(get_kata_containers_config_path "${shim}")/${configuration}.toml\"
-	
+
 	tomlq -i -t $(printf '%s.runtime_type=%s' ${runtime_table} ${runtime_type}) ${containerd_conf_file}
 	tomlq -i -t $(printf '%s.privileged_without_host_devices=true' ${runtime_table}) ${containerd_conf_file}
 	tomlq -i -t $(printf '%s.pod_annotations=["io.katacontainers.*"]' ${runtime_table}) ${containerd_conf_file}
 	tomlq -i -t $(printf '%s.ConfigPath=%s' ${runtime_options_table} ${runtime_config_path}) ${containerd_conf_file}
-	
+
 	if [ "${DEBUG}" == "true" ]; then
 		tomlq -i -t '.debug.level = "debug"' ${containerd_conf_file}
 	fi
@@ -636,6 +643,27 @@ function snapshotter_handler_mapping_validation_check() {
 	done
 }
 
+function create_sysext() {
+	echo "Creating kata-containers systemd-sysext"
+	KATA_PATH="/host/tmp/kata-deploy"
+
+	pushd ${KATA_PATH}
+	cp /opt/kata-artifacts/scripts/bake.sh ${KATA_PATH}
+	chmod +x bake.sh
+	./bake.sh kata
+	mv kata.raw /host/etc/extensions
+	popd
+
+	host_systemd_sysext_reload
+	rm -rf ${KATA_PATH}
+}
+
+function remove_sysext() {
+	echo "Deleting kata-containers systemd-sysext"
+	rm /host/etc/extensions/kata.raw
+	host_systemd_sysext_reload
+}
+
 function main() {
 	echo "Environment variables passed to this script"
 	echo "* NODE_NAME: ${NODE_NAME}"
@@ -670,7 +698,7 @@ function main() {
 		containerd_conf_file="${containerd_conf_tmpl_file}"
 		containerd_conf_file_backup="${containerd_conf_file}.bak"
 	elif [ "$runtime" == "k0s-worker" ] || [ "$runtime" == "k0s-controller" ]; then
-		# From 1.27.1 onwards k0s enables dynamic configuration on containerd CRI runtimes. 
+		# From 1.27.1 onwards k0s enables dynamic configuration on containerd CRI runtimes.
 		# This works by k0s creating a special directory in /etc/k0s/containerd.d/ where user can drop-in partial containerd configuration snippets.
 		# k0s will automatically pick up these files and adds these in containerd configuration imports list.
 		containerd_conf_file="/etc/containerd/kata-containers.toml"
@@ -706,6 +734,7 @@ function main() {
 			cleanup_cri_runtime "$runtime"
 			kubectl label node "$NODE_NAME" --overwrite katacontainers.io/kata-runtime=cleanup
 			remove_artifacts
+			remove_sysext
 			;;
 		reset)
 			reset_runtime $runtime
