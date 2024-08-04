@@ -13,17 +13,21 @@ set -o errtrace
 
 KATA_DEPLOY_DIR="`dirname ${0}`/../../kata-deploy"
 KATA_DEPLOY_ARTIFACT="${1:-"kata-static.tar.xz"}"
-REGISTRY="${2:-"quay.io/kata-containers/kata-deploy"}"
+REGISTRY="${2:-"ghcr.io/mmhartmann/kata-deploy"}"
 TAG="${3:-}"
+BAKE_SH_URL="https://raw.githubusercontent.com/flatcar/sysext-bakery/main/bake.sh"
 
 echo "Copying ${KATA_DEPLOY_ARTIFACT} to ${KATA_DEPLOY_DIR}"
 cp ${KATA_DEPLOY_ARTIFACT} ${KATA_DEPLOY_DIR}
 
 pushd ${KATA_DEPLOY_DIR}
 
+# Include the bake.sh script from the sysext-bakery
+wget "${BAKE_SH_URL}" -O "scripts/bake.sh"
+
 arch=$(uname -m)
 [ "$arch" = "x86_64" ] && arch="amd64"
-IMAGE_TAG="${REGISTRY}:kata-containers-$(git rev-parse HEAD)-${arch}"
+IMAGE_TAG="${REGISTRY}:kata-containers"
 
 echo "Building the image"
 docker build --tag ${IMAGE_TAG} .
@@ -41,5 +45,7 @@ if [ -n "${TAG}" ]; then
 	echo "Pushing the image ${ADDITIONAL_TAG} to the registry"
 	docker push ${ADDITIONAL_TAG}
 fi
+
+rm "scripts/bake.sh"
 
 popd
