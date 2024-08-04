@@ -27,7 +27,7 @@ wget "${BAKE_SH_URL}" -O "scripts/bake.sh"
 
 arch=$(uname -m)
 [ "$arch" = "x86_64" ] && arch="amd64"
-IMAGE_TAG="${REGISTRY}:kata-containers"
+IMAGE_TAG="${REGISTRY}/kata-containers"
 
 echo "Building the image"
 docker build --tag ${IMAGE_TAG} .
