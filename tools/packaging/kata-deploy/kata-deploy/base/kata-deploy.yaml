@@ -78,11 +78,11 @@ spec:
             path: /etc/containerd/
         - name: kata-artifacts
           hostPath:
-            path: /tmp/kata-deploy/kata/opt/kata/
+            path: /var/tmp/kata-deploy/kata/opt/kata/
             type: DirectoryOrCreate
         - name: local-bin
           hostPath:
-            path: /tmp/kata-deploy/kata/usr/local/bin/
+            path: /var/tmp/kata-deploy/kata/usr/local/bin/
             type: DirectoryOrCreate
         - name: host
           hostPath:

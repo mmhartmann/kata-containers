@@ -645,7 +645,8 @@ function snapshotter_handler_mapping_validation_check() {
 
 function create_sysext() {
 	echo "Creating kata-containers systemd-sysext"
-	KATA_PATH="/host/tmp/kata-deploy"
+	KATA_PATH="/host/var/tmp/kata-deploy"
+	mkdir -p "${KATA_PATH}"
 
 	pushd ${KATA_PATH}
 	cp /opt/kata-artifacts/scripts/bake.sh ${KATA_PATH}
